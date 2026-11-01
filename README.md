@@ -2,6 +2,10 @@
 
 A small, read-only Go service for certificates stored in Vault PKI mounts. The UI has search, expiry status, a history filter, and certificate details. It needs no JavaScript build step or external font service.
 
+![Dark certificate dashboard with sample data showing expiry status and certificate details](docs/images/certificate-watcher-demo.png)
+
+*Preview with sample data.*
+
 The watcher discovers PKI mounts and refreshes every five minutes. Refresh now starts an immediate scan. A failed scan keeps the last complete result in memory and shows the error and last successful refresh time. Restarting the container clears this cache.
 
 Green means more than 720 hours remain. Orange means 168 through 720 hours remain. Red means less than 168 hours remain. Expired and revoked certificates are hidden by default. Times use the viewer's local time zone. “Valid from” is the certificate's NotBefore time, which Vault can backdate.
