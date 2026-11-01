@@ -1,0 +1,37 @@
+services:
+  agent:
+    image: hashicorp/vault:1.21
+    user: "${WATCHER_UID:-1000}:${WATCHER_GID:-1000}"
+    entrypoint: ["vault", "agent", "-config=/config/agent.hcl"]
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    volumes:
+      - ${WATCHER_AGENT_CONFIG:-./deploy/agent.hcl}:/config/agent.hcl:ro
+      - ${WATCHER_SECRET_DIR:?Set WATCHER_SECRET_DIR}:/seed:ro
+      - ${WATCHER_SINK_DIR:?Set WATCHER_SINK_DIR}:/sink
+      - ${VAULT_CA_FILE:?Set VAULT_CA_FILE}:/ca/root-ca.pem:ro
+    networks: [vault]
+  watcher:
+    build: .
+    user: "${WATCHER_UID:-1000}:${WATCHER_GID:-1000}"
+    restart: unless-stopped
+    depends_on: [agent]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    environment:
+      VAULT_ADDR: https://vault:8200
+      VAULT_TLS_SERVER_NAME: ${VAULT_TLS_SERVER_NAME:-vault.home}
+    ports:
+      - "${WATCHER_BIND_IP:-127.0.0.1}:${WATCHER_PORT:-8201}:8080"
+    volumes:
+      - ${WATCHER_SINK_DIR}:/sink:ro
+      - ${VAULT_CA_FILE}:/ca/root-ca.pem:ro
+    networks: [vault]
+networks:
+  vault:
+    external: true
+    name: ${VAULT_NETWORK:-vault_default}
