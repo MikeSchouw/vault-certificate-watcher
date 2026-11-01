@@ -199,7 +199,7 @@ func (w *Watcher) handler(ctx context.Context) http.Handler {
 		if path == "/" {
 			path = "/index.html"
 		}
-		if path != "/index.html" && path != "/style.css" && path != "/app.js" {
+		if path != "/index.html" && path != "/style.css" && path != "/app.js" && path != "/favicon.svg" {
 			http.NotFound(rw, r)
 			return
 		}
@@ -213,6 +213,8 @@ func (w *Watcher) handler(ctx context.Context) http.Handler {
 			rw.Header().Set("Content-Type", "text/css")
 		case "/app.js":
 			rw.Header().Set("Content-Type", "text/javascript")
+		case "/favicon.svg":
+			rw.Header().Set("Content-Type", "image/svg+xml")
 		default:
 			rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 		}
