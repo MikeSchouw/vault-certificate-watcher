@@ -18,6 +18,8 @@ services:
     build: .
     user: "${WATCHER_UID:-1000}:${WATCHER_GID:-1000}"
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     depends_on: [agent]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
