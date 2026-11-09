@@ -14,7 +14,7 @@ Green means more than 720 hours remain. Orange means 168 through 720 hours remai
 
 Requirements: Docker with Compose, an existing Vault network, a trusted Vault CA, and a renewable read-only token.
 
-1. Copy `.env.example` to `.env`. Set the host bind address, CA path, network, and private token and sink directories. Keep both directories outside this repository with mode `0700` and ownership matching `WATCHER_UID` and `WATCHER_GID`.
+1. Copy `.env.example` to `.env`. Set the host bind address, CA path, network, and private token and sink directories. Keep both directories outside this repository with mode `0700` and ownership matching `WATCHER_UID` and `WATCHER_GID`. For Discord alerts, set `DISCORD_WEBHOOK_URL` in `.env`. Set `WATCHER_DASHBOARD_URL` if Discord users need a custom URL to reach the dashboard.
 2. Put the seed token in `WATCHER_SECRET_DIR/token` with mode `0600`. Use a private credential flow. Never put a token in Compose, Git, or a command argument.
 3. Set the address, TLS name, and CA path in `deploy/agent.hcl` for your Vault server. The Compose example uses the service name `vault` and verifies the TLS name `vault.home`. Set `VAULT_TLS_SERVER_NAME` to the same name for the watcher. For a custom Agent file, set `WATCHER_AGENT_CONFIG`.
 4. Run `docker compose up -d --build`.
@@ -22,7 +22,7 @@ Requirements: Docker with Compose, an existing Vault network, a trusted Vault CA
 
 The default host bind address is loopback. Binding a LAN address permits all devices that can reach that address to read the UI. This version uses HTTP and has no login. Restrict network access as needed for your installation.
 
-The separate Vault Agent renews the seed token and writes `/sink/token`. The watcher mounts only the sink and public CA, both read-only. It never mounts an issuing Agent bundle or private key. Both services run without root privileges or Linux capabilities. The private sink directory must exist before startup.
+The separate Vault Agent renews the seed token and writes `/sink/token`. It does not issue or renew PKI certificates. The watcher reads the stored certificates from Vault on startup and every five minutes. It mounts only the sink and public CA, both read-only. It never mounts an issuing Agent bundle or private key. Both services run without root privileges or Linux capabilities. The private sink directory must exist before startup.
 
 For token replacement, write the new token to the private seed file and run `docker compose restart agent watcher`. If you replace the seed file by rename, the directory mount makes the replacement visible. The Agent cannot create a new token when the seed token expires or is revoked. The token_file method has this documented limit and is accepted for this first version.
 
@@ -38,12 +38,16 @@ path "auth/token/renew-self" { capabilities = ["update"] }
 
 `sys/mounts` exposes mount names and metadata. Individual public certificates are read from Vault's unauthenticated certificate endpoint. The token needs no issue, revoke, or write permission. A PKI mount without list permission causes the scan to fail visibly rather than present an incomplete inventory.
 
-The inventory includes only certificates Vault still stores. Certificates issued with storage disabled and records removed by tidy cannot appear. There is no history database and no alert delivery.
+The inventory includes only certificates Vault still stores. Certificates issued with storage disabled and records removed by tidy cannot appear. There is no history database.
+
+## Discord alerts
+
+Set `DISCORD_WEBHOOK_URL` in the local, ignored `.env` file to enable alerts. The watcher sends an alert when a certificate is within `CERT_EXPIRY_ALERT_DAYS` (15 days by default) and a second alert within `CERT_EXPIRY_REMINDER_DAYS` (5 days by default). The first alert uses an orange warning embed. The 5-day alert uses a red siren embed. Both show the subject, Vault mount, serial, expiry time, time left, and a link to the dashboard. By default, the link uses the host bind address and port. Set `WATCHER_DASHBOARD_URL` if users need another URL. The URL must be reachable by the people who receive the alert. Revoked and expired certificates do not send alerts. A failed delivery is tried again on the next refresh. Successful alerts are remembered in memory, so a restart can send an alert again if the certificate is still within that alert window. The webhook URL is a secret: keep `.env` private and do not commit it.
 
 Sources: [Vault PKI API](https://developer.hashicorp.com/vault/api-docs/secret/pki), [Agent token_file method](https://developer.hashicorp.com/vault/docs/agent-and-proxy/autoauth/methods/token_file).
 
 ## Development
 
-Run `go test -race ./...` and `go vet ./...`. Build with `go build .`. The server reads `VAULT_ADDR`, `VAULT_CACERT`, `VAULT_TLS_SERVER_NAME`, `VAULT_TOKEN_FILE`, and `LISTEN_ADDR`. Defaults match Compose. `/healthz` confirms the HTTP process is running; `/api/certificates` reports Vault scan health separately.
+Run `go test -race ./...` and `go vet ./...`. Build with `go build .`. The server reads `VAULT_ADDR`, `VAULT_CACERT`, `VAULT_TLS_SERVER_NAME`, `VAULT_TOKEN_FILE`, `LISTEN_ADDR`, `DISCORD_WEBHOOK_URL`, `CERT_EXPIRY_ALERT_DAYS`, `CERT_EXPIRY_REMINDER_DAYS`, `WATCHER_BIND_IP`, `WATCHER_PORT`, and `WATCHER_DASHBOARD_URL`. Defaults match Compose. `/healthz` confirms the HTTP process is running; `/api/certificates` reports Vault scan health separately.
 
 License: Apache-2.0.
